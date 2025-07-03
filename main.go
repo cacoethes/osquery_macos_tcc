@@ -77,7 +77,11 @@ func queryTCCDB(dbPath, dbType, username string) ([]map[string]string, error) {
         debugLog("Failed to open DB %s: %v", dbPath, err)
         return nil, fmt.Errorf("open TCC db: %w", err)
     }
-    defer db.Close()
+    defer func() {
+        if err := db.Close(); err != nil {
+            debugLog("Error closing DB %s: %v", dbPath, err)
+        }
+    }()
 
     rows, err := db.Query(`
         SELECT service, client, client_type, auth_value, auth_reason, auth_version,
@@ -90,7 +94,11 @@ func queryTCCDB(dbPath, dbType, username string) ([]map[string]string, error) {
         debugLog("Failed to query DB %s: %v", dbPath, err)
         return nil, fmt.Errorf("query TCC db: %w", err)
     }
-    defer rows.Close()
+    defer func() {
+        if err := rows.Close(); err != nil {
+            debugLog("Error closing rows for %s: %v", dbPath, err)
+        }
+    }()
 
     for rows.Next() {
         var (
@@ -249,5 +257,7 @@ func main() {
     debugLog("Registering macos_tcc table plugin")
     server.RegisterPlugin(tccTable())
     debugLog("Running osquery extension manager server...")
-    server.Run()
+    if err := server.Run(); err != nil {
+        log.Fatalf("Error running osquery extension: %v", err)
+    }
 }
